@@ -6,3 +6,4 @@ pandas
 numpy
 Flask
 gunicorn
+flask_cors
