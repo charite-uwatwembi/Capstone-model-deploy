@@ -1,10 +1,13 @@
 import os
 import joblib
 import pandas as pd
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort, Response
 import logging
 import re
 from flask_cors import CORS
+from dotenv import load_dotenv
+from twilio.request_validator import RequestValidator
+from twilio.twiml.messaging_response import MessagingResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # This enables CORS for all routes
+
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 
 MODEL_COLUMNS = [
     'Temparature', 'Humidity', 'Moisture', 'Soil_Type', 'Crop_Type',
@@ -26,27 +31,24 @@ class FertilizerModelServer:
 
     def load_model(self):
         try:
-            model_path = os.path.join(os.path.dirname(__file__), 'fertilizer.pkl')
+            ml_models_dir = os.path.join(os.path.dirname(__file__), '..', 'ML_Models')
+            model_path = os.path.join(ml_models_dir, 'fertilizer.pkl')
             if not os.path.exists(model_path):
                 logger.error(f"Model file not found at {model_path}")
                 return False
-
+            # The pickle file contains the LabelEncoder
             self.label_encoder = joblib.load(model_path)
-
-            classifier_path = os.path.join(os.path.dirname(__file__), 'classifier.pkl')
+            # The classifier is assumed to be in 'classifier.pkl' in the same directory
+            classifier_path = os.path.join(ml_models_dir, 'classifier.pkl')
             if not os.path.exists(classifier_path):
                 logger.error(f"Classifier file not found at {classifier_path}")
                 return False
-
             self.model = joblib.load(classifier_path)
-
-            logger.info("Successfully loaded model and label encoder")
+            logger.info(f"Successfully loaded model and label encoder from {ml_models_dir}")
             return True
-
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
             return False
-
 
     def predict(self, input_data):
         try:
@@ -117,5 +119,25 @@ def predict():
         logger.error(f"Prediction endpoint error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route("/sms", methods=["POST"])
+def sms_reply():
+    # 1. Validate Twilio signature
+    validator = RequestValidator(TWILIO_AUTH_TOKEN)
+    twilio_signature = request.headers.get("X-Twilio-Signature", "")
+    url = request.url
+    post_vars = request.form.to_dict()
+
+    is_valid = validator.validate(url, post_vars, twilio_signature)
+    if not is_valid:
+        abort(403)  # Forbidden if not from Twilio
+
+    # 2. Process the message and reply
+    incoming_msg = post_vars.get('Body', '').strip()
+    resp = MessagingResponse()
+    resp.message(f"You said: {incoming_msg}")
+
+    return Response(str(resp), mimetype='application/xml')
+
 if __name__ == '__main__':
+    load_dotenv()
     app.run(host='0.0.0.0', port=8000, debug=True)
