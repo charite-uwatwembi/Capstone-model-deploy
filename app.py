@@ -31,24 +31,27 @@ class FertilizerModelServer:
 
     def load_model(self):
         try:
-            ml_models_dir = os.path.join(os.path.dirname(__file__), '..', 'ML_Models')
-            model_path = os.path.join(ml_models_dir, 'fertilizer.pkl')
+            model_path = os.path.join(os.path.dirname(__file__), 'fertilizer.pkl')
             if not os.path.exists(model_path):
                 logger.error(f"Model file not found at {model_path}")
                 return False
-            # The pickle file contains the LabelEncoder
+
             self.label_encoder = joblib.load(model_path)
-            # The classifier is assumed to be in 'classifier.pkl' in the same directory
-            classifier_path = os.path.join(ml_models_dir, 'classifier.pkl')
+
+            classifier_path = os.path.join(os.path.dirname(__file__), 'classifier.pkl')
             if not os.path.exists(classifier_path):
                 logger.error(f"Classifier file not found at {classifier_path}")
                 return False
+
             self.model = joblib.load(classifier_path)
-            logger.info(f"Successfully loaded model and label encoder from {ml_models_dir}")
+
+            logger.info("Successfully loaded model and label encoder")
             return True
+
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
             return False
+
 
     def predict(self, input_data):
         try:
