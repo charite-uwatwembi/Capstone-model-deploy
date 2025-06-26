@@ -8,3 +8,4 @@ Flask
 gunicorn
 flask_cors
 dotenv
+twilio
