@@ -1,1 +1,1 @@
-This repo is my model deployment repository
+This repo is for my model deployment repository
